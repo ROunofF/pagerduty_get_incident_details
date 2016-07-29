@@ -39,18 +39,19 @@ def get_incidents(since, until, service_id=None):
         data=json.dumps(params)
     )
 
-    print "Exporting incident data to " + file_name + since
+    print >>sys.stderr, "Exporting incident data to " + file_name + since
     for incident in all_incidents.json()['incidents']:
         get_incident_details(incident["id"], str(incident["incident_number"]), incident["service"]["name"], file_name+since+".csv")
-    print "Exporting has completed successfully."
+    print >>sys.stderr, "Exporting has completed successfully."
 
 def get_incident_details(incident_id, incident_number, service, file_name):
     start_time = ""
     end_time = ""
     summary = ""
-    has_details = False
-    has_summary = False
-    output = incident_number + "," + service + ","
+    facility = ""
+    environment = ""
+    owners = ""
+    output = incident_number + "," + service.rstrip() + ","
 
     f = open(file_name,'a')
 
@@ -64,20 +65,33 @@ def get_incident_details(incident_id, incident_number, service, file_name):
             if log_entry["created_at"] > start_time:
                 start_time = log_entry["created_at"]
                 if ("summary" in log_entry["channel"]):
-                    has_summary = True
                     summary = log_entry["channel"]["summary"]
                 if ("details" in log_entry["channel"]):
-                    has_details = True
                     details = log_entry["channel"]["details"]
+                    if("check" in details):
+                        check = details["check"]
+                        # Override summary with the output from the check only
+                        if ("output" in check):
+                            summary = check["output"] 
+                    if ("client" in details):
+                        client = details["client"]
+                        if ("facility" in client):
+                            facility = client["facility"]
+                        if ("environment" in client):
+                            environment = client["environment"]
+                        if ("owners" in client):
+                            owners = client["owners"]
+
         elif log_entry["type"] == "resolve":
             end_time = log_entry["created_at"]
 
     output += start_time + ","
     output += end_time
-    if (has_summary):
-        output += ",\"" + summary + "\""
-    if (has_details):
-        output += ",\"" + str(details) + "\""
+    output += ",\"" + summary.rstrip() + "\""
+    output += ",\"" + str(facility) + "\""
+    output += ",\"" + str(environment) + "\""
+    output += ",\"" + str(owners) + "\""
+    output += ",\"" + str(details) + "\""
     output += "\n"
     print output
     f.write(output)
